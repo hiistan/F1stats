@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Formula 1 Teams Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--page:#ebebeb;--ink:#151a24;--ink-soft:#5a6478;--line:rgba(20,30,50,.10);--glass:rgba(235,235,235,.55);--shadow:0 10px 30px rgba(20,35,70,.06);--gold:#c9931a;
+--team:#888;--tint:rgba(0,0,0,.03);--tint-strong:rgba(0,0,0,.05);--edge:rgba(0,0,0,.12);--radius:18px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--page:#ebebeb;--ink:#151a24;--ink-soft:#5a6478;--line:rgba(255,255,255,.14);--glass:rgba(255,255,255,.07);--shadow:0 10px 30px rgba(0,0,0,.35);--gold:#ffcc55}}
+*{margin:0;padding:0;box-sizing:border-box;font-family:"Inter",system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{background:var(--page)}
+img{max-width:100%}
+body{color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden;
+padding:22px max(clamp(14px,3vw,34px),env(safe-area-inset-right)) 30px max(clamp(14px,3vw,34px),env(safe-area-inset-left))}
+header,.pages,footer{width:100%;max-width:1680px;margin-inline:auto}
+
+/* HEADER */
+header{display:flex;justify-content:space-between;align-items:center;gap:12px 16px;flex-wrap:wrap;margin-bottom:20px}
+.logo{padding:6px 14px;height:48px;display:flex;align-items:center;cursor:pointer;transition:opacity .2s ease,transform .2s ease}
+.logo:hover{opacity:.82;transform:translateY(-1px)}
+.logo img{height:100%;width:auto;max-width:160px;display:block;object-fit:contain}
+.driver-standing{padding:12px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;border:1px solid transparent;border-radius:var(--radius);transition:transform .25s ease,box-shadow .25s ease,background .25s ease}
+.driver-standing h3{font-size:15px;font-weight:600}
+.driver-icon{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-soft);flex:0 0 auto}
+.driver-icon svg{width:20px;height:20px}
+@media (hover:hover){.driver-standing:hover{transform:translateY(-2px);border-color:var(--line);background:var(--glass);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--shadow)}}
+
+input[type="radio"]{position:absolute;opacity:0;pointer-events:none}
+.team-page{display:none}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* LAYOUT: 3 columns desktop, 2 tablet, 1 phone */
+.page-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);gap:20px;margin-top:12px;align-items:start}
+.team-info{padding:24px}
+.team-info h2{font-size:21px;font-weight:800;margin-bottom:10px;letter-spacing:-.01em}
+.team-info p{line-height:1.65;font-size:14.5px;color:var(--ink-soft)}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.pill{padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:999px;background:var(--tint-strong);border:1px solid var(--edge);color:var(--ink-soft)}
+.car-view{text-align:center;min-width:0}
+.car-view h1{font-size:clamp(26px,4vw,42px);font-weight:900;letter-spacing:-.02em;margin-bottom:14px;color:var(--team);overflow-wrap:anywhere}
+
+/* 360 STAGE */
+.stage{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:var(--page);touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.ghost{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;font-size:clamp(34px,9.5vw,120px);font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--team);opacity:.16;white-space:nowrap;user-select:none;pointer-events:none}
+@media (min-width:1101px){.ghost{font-size:clamp(38px,6vw,110px)}}
+.fr{position:absolute;inset:0;z-index:2;background-repeat:no-repeat;background-position:center;background-size:contain;opacity:0;animation:spin360 8.4s linear infinite}
+@keyframes spin360{0%,4.2%{opacity:1}4.9%,100%{opacity:0}}
+.z{position:absolute;top:0;height:100%;width:5%;z-index:9;cursor:ew-resize}
+.z:hover~.fr,.z:active~.fr{animation:none;opacity:0}
+.z::after{content:attr(data-n);position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.12em;padding:4px 9px;border-radius:999px;white-space:nowrap;background:rgba(255,255,255,.9);border:1px solid rgba(20,35,70,.12);color:#35405a;opacity:0;transition:opacity .15s ease}
+.z:hover::after,.z:active::after{opacity:1}
+.hint{margin-top:10px;font-size:12px;color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){.fr{animation:none}.fr1{opacity:1}}
+
+/* TRACKS */
+.tracks{padding:14px 16px}
+.tracks h3{font-size:13px;font-weight:800;margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft)}
+.track-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.track{padding:8px 10px;border-radius:10px;background:var(--tint-strong);border:1px solid var(--edge);color:var(--team);display:flex;flex-direction:column;gap:1px;align-items:flex-start;transition:transform .2s ease;cursor:default;min-width:0}
+@media (hover:hover){.track:hover{transform:translateY(-2px)}}
+.track.dim{opacity:.68}
+.track svg{width:34px;height:20px;margin-bottom:2px}
+.t-role{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--team)}
+.track strong{font-size:12px;font-weight:800;color:var(--ink);line-height:1.2;overflow-wrap:anywhere}
+.t-sub{font-size:10.5px;color:var(--ink-soft);font-weight:600}
+
+/* STANDINGS */
+.standings{--tint:rgba(225,6,0,.05);--tint-strong:rgba(225,6,0,.08);--edge:rgba(20,30,50,.12);padding:24px;margin-top:12px}
+.sh{margin-bottom:16px}
+.sh h2{font-size:clamp(19px,3vw,23px);font-weight:900;letter-spacing:-.02em}
+.sh .sub{font-size:12.5px;color:var(--ink-soft);line-height:1.5;display:block;margin-top:2px}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;min-width:0}
+th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+@media (hover:hover){tr:hover td{background:rgba(20,30,50,.035)}}
+.pos{color:var(--ink-soft);font-weight:700;width:34px}
+.who{display:flex;align-items:center;gap:10px}
+.avatar{width:30px;height:30px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.nm{font-weight:700;white-space:nowrap}
+.tm{white-space:nowrap;color:var(--ink-soft);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+.nat{white-space:nowrap;color:var(--ink-soft)}
+.flag{margin-right:8px}
+.pts{font-weight:800;text-align:right}
+th:last-child{text-align:right}
+.foot-note{margin-top:12px;font-size:11.5px;color:var(--ink-soft);line-height:1.5}
+.cons-head{margin:26px 0 14px;font-size:17px;font-weight:800}
+.cons-row{display:grid;grid-template-columns:26px 120px 1fr 54px;align-items:center;gap:10px;padding:5px 0}
+.cons-pos{color:var(--ink-soft);font-weight:700;font-size:13px}
+.cons-name{font-weight:700;font-size:13.5px;white-space:nowrap}
+.cons-bar{height:10px;border-radius:999px;background:rgba(20,30,50,.07);overflow:hidden}
+.cons-bar span{display:block;height:100%;border-radius:999px}
+.cons-pts{text-align:right;font-weight:800;font-size:13.5px}
+
+/* FOOTER: phone-first (wrapping, no overlap) */
+footer{margin-top:26px;padding:14px 4px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px}
+.team-circle{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--page);box-shadow:0 4px 12px rgba(20,35,70,.16);overflow:hidden;cursor:pointer;flex:0 0 auto;transition:margin .45s cubic-bezier(.22,.9,.3,1),transform .2s ease,box-shadow .2s ease;-webkit-tap-highlight-color:transparent}
+.team-circle svg{width:100%;height:100%;display:block}
+.trophy-row{display:none;flex:1 0 100%;justify-content:center;align-items:center;flex-wrap:wrap;gap:4px;margin-top:6px}
+.trophy-row img{height:28px;width:auto;display:block;filter:drop-shadow(0 2px 4px rgba(20,35,70,.25))}
+.trophy-row .t-empty{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+@media (min-width:640px){.trophy-row img{height:38px}}
+/* tablet/desktop with a pointer: overlapping stack that fans out on hover */
+@media (min-width:640px) and (hover:hover){
+ footer{justify-content:flex-start;gap:0;padding:14px 20px}
+ .team-circle{width:36px;height:36px;margin-left:-18px}
+ .team-circle:first-of-type{margin-left:0}
+ footer:hover .team-circle{margin-left:6px}
+ footer:hover .team-circle:first-of-type{margin-left:0}
+ .team-circle:hover{transform:translateY(-4px) scale(1.08);z-index:20;box-shadow:0 10px 22px rgba(20,35,70,.26)}
+}
+@media (min-width:900px){
+ .trophy-row{flex:0 1 auto;margin:0 0 0 auto;padding-left:18px;justify-content:flex-end;flex-wrap:nowrap}
+ .trophy-row img{height:clamp(32px,3.6vw,50px)}
+}
+
+.fr1{animation-delay:-0.00s}
+.fr2{animation-delay:-0.42s}
+.fr3{animation-delay:-0.84s}
+.fr4{animation-delay:-1.26s}
+.fr5{animation-delay:-1.68s}
+.fr6{animation-delay:-2.10s}
+.fr7{animation-delay:-2.52s}
+.fr8{animation-delay:-2.94s}
+.fr9{animation-delay:-3.36s}
+.fr10{animation-delay:-3.78s}
+.fr11{animation-delay:-4.20s}
+.fr12{animation-delay:-4.62s}
+.fr13{animation-delay:-5.04s}
+.fr14{animation-delay:-5.46s}
+.fr15{animation-delay:-5.88s}
+.fr16{animation-delay:-6.30s}
+.fr17{animation-delay:-6.72s}
+.fr18{animation-delay:-7.14s}
+.fr19{animation-delay:-7.56s}
+.fr20{animation-delay:-7.98s}
+.z1{left:0%}
+.z2{left:5%}
+.z3{left:10%}
+.z4{left:15%}
+.z5{left:20%}
+.z6{left:25%}
+.z7{left:30%}
+.z8{left:35%}
+.z9{left:40%}
+.z10{left:45%}
+.z11{left:50%}
+.z12{left:55%}
+.z13{left:60%}
+.z14{left:65%}
+.z15{left:70%}
+.z16{left:75%}
+.z17{left:80%}
+.z18{left:85%}
+.z19{left:90%}
+.z20{left:95%}
+.z1:hover~.fr1,.z1:active~.fr1{animation:none;opacity:1}
+.z2:hover~.fr2,.z2:active~.fr2{animation:none;opacity:1}
+.z3:hover~.fr3,.z3:active~.fr3{animation:none;opacity:1}
+.z4:hover~.fr4,.z4:active~.fr4{animation:none;opacity:1}
+.z5:hover~.fr5,.z5:active~.fr5{animation:none;opacity:1}
+.z6:hover~.fr6,.z6:active~.fr6{animation:none;opacity:1}
+.z7:hover~.fr7,.z7:active~.fr7{animation:none;opacity:1}
+.z8:hover~.fr8,.z8:active~.fr8{animation:none;opacity:1}
+.z9:hover~.fr9,.z9:active~.fr9{animation:none;opacity:1}
+.z10:hover~.fr10,.z10:active~.fr10{animation:none;opacity:1}
+.z11:hover~.fr11,.z11:active~.fr11{animation:none;opacity:1}
+.z12:hover~.fr12,.z12:active~.fr12{animation:none;opacity:1}
+.z13:hover~.fr13,.z13:active~.fr13{animation:none;opacity:1}
+.z14:hover~.fr14,.z14:active~.fr14{animation:none;opacity:1}
+.z15:hover~.fr15,.z15:active~.fr15{animation:none;opacity:1}
+.z16:hover~.fr16,.z16:active~.fr16{animation:none;opacity:1}
+.z17:hover~.fr17,.z17:active~.fr17{animation:none;opacity:1}
+.z18:hover~.fr18,.z18:active~.fr18{animation:none;opacity:1}
+.z19:hover~.fr19,.z19:active~.fr19{animation:none;opacity:1}
+.z20:hover~.fr20,.z20:active~.fr20{animation:none;opacity:1}
+input#mercedes:checked ~ .pages #mercedes-page,
+input#ferrari:checked ~ .pages #ferrari-page,
+input#redbull:checked ~ .pages #redbull-page,
+input#mclaren:checked ~ .pages #mclaren-page,
+input#astonmartin:checked ~ .pages #astonmartin-page,
+input#alpine:checked ~ .pages #alpine-page,
+input#williams:checked ~ .pages #williams-page,
+input#rb:checked ~ .pages #rb-page,
+input#audi:checked ~ .pages #audi-page,
+input#haas:checked ~ .pages #haas-page,
+input#cadillac:checked ~ .pages #cadillac-page,
+input#standings:checked ~ .pages #standings-page{display:block;animation:fade .35s ease}
+#mercedes-page{--team:#0f8b84;--tint:rgba(15,139,132,.035);--tint-strong:rgba(15,139,132,.06);--edge:rgba(15,139,132,.14)}
+#ferrari-page{--team:#c00000;--tint:rgba(192,0,0,.035);--tint-strong:rgba(192,0,0,.06);--edge:rgba(192,0,0,.14)}
+#redbull-page{--team:#1b3fcc;--tint:rgba(27,63,204,.035);--tint-strong:rgba(27,63,204,.06);--edge:rgba(27,63,204,.14)}
+#mclaren-page{--team:#e56a00;--tint:rgba(229,106,0,.035);--tint-strong:rgba(229,106,0,.06);--edge:rgba(229,106,0,.14)}
+#astonmartin-page{--team:#006f62;--tint:rgba(0,111,98,.035);--tint-strong:rgba(0,111,98,.06);--edge:rgba(0,111,98,.14)}
+#alpine-page{--team:#0077d6;--tint:rgba(0,119,214,.035);--tint-strong:rgba(0,119,214,.06);--edge:rgba(0,119,214,.14)}
+#williams-page{--team:#1868db;--tint:rgba(24,104,219,.035);--tint-strong:rgba(24,104,219,.06);--edge:rgba(24,104,219,.14)}
+#rb-page{--team:#2b2d42;--tint:rgba(43,45,66,.035);--tint-strong:rgba(43,45,66,.06);--edge:rgba(43,45,66,.14)}
+#audi-page{--team:#d6302a;--tint:rgba(214,48,42,.035);--tint-strong:rgba(214,48,42,.06);--edge:rgba(214,48,42,.14)}
+#haas-page{--team:#b30000;--tint:rgba(179,0,0,.035);--tint-strong:rgba(179,0,0,.06);--edge:rgba(179,0,0,.14)}
+#cadillac-page{--team:#1b2a4a;--tint:rgba(27,42,74,.035);--tint-strong:rgba(27,42,74,.06);--edge:rgba(27,42,74,.14)}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]) #mercedes-page{--team:#2fd4c7;--tint:rgba(47,212,199,.035);--tint-strong:rgba(47,212,199,.16);--edge:rgba(47,212,199,.28)}
+:root:not([data-theme="light"]) #ferrari-page{--team:#ff5a4d;--tint:rgba(255,90,77,.035);--tint-strong:rgba(255,90,77,.16);--edge:rgba(255,90,77,.28)}
+:root:not([data-theme="light"]) #redbull-page{--team:#6d8bff;--tint:rgba(109,139,255,.035);--tint-strong:rgba(109,139,255,.16);--edge:rgba(109,139,255,.28)}
+:root:not([data-theme="light"]) #mclaren-page{--team:#ff9b3d;--tint:rgba(255,155,61,.035);--tint-strong:rgba(255,155,61,.16);--edge:rgba(255,155,61,.28)}
+:root:not([data-theme="light"]) #astonmartin-page{--team:#2fbfa8;--tint:rgba(47,191,168,.035);--tint-strong:rgba(47,191,168,.16);--edge:rgba(47,191,168,.28)}
+:root:not([data-theme="light"]) #alpine-page{--team:#5cb3ff;--tint:rgba(92,179,255,.035);--tint-strong:rgba(92,179,255,.16);--edge:rgba(92,179,255,.28)}
+:root:not([data-theme="light"]) #williams-page{--team:#6ea8ff;--tint:rgba(110,168,255,.035);--tint-strong:rgba(110,168,255,.16);--edge:rgba(110,168,255,.28)}
+:root:not([data-theme="light"]) #rb-page{--team:#aab3cc;--tint:rgba(170,179,204,.035);--tint-strong:rgba(170,179,204,.16);--edge:rgba(170,179,204,.28)}
+:root:not([data-theme="light"]) #audi-page{--team:#ff6a5e;--tint:rgba(255,106,94,.035);--tint-strong:rgba(255,106,94,.16);--edge:rgba(255,106,94,.28)}
+:root:not([data-theme="light"]) #haas-page{--team:#ff6b6b;--tint:rgba(255,107,107,.035);--tint-strong:rgba(255,107,107,.16);--edge:rgba(255,107,107,.28)}
+:root:not([data-theme="light"]) #cadillac-page{--team:#8fa6d8;--tint:rgba(143,166,216,.035);--tint-strong:rgba(143,166,216,.16);--edge:rgba(143,166,216,.28)}
+}
+input#mercedes:checked ~ footer .team-circle[for="mercedes"],
+input#ferrari:checked ~ footer .team-circle[for="ferrari"],
+input#redbull:checked ~ footer .team-circle[for="redbull"],
+input#mclaren:checked ~ footer .team-circle[for="mclaren"],
+input#astonmartin:checked ~ footer .team-circle[for="astonmartin"],
+input#alpine:checked ~ footer .team-circle[for="alpine"],
+input#williams:checked ~ footer .team-circle[for="williams"],
+input#rb:checked ~ footer .team-circle[for="rb"],
+input#audi:checked ~ footer .team-circle[for="audi"],
+input#haas:checked ~ footer .team-circle[for="haas"],
+input#cadillac:checked ~ footer .team-circle[for="cadillac"]{transform:translateY(-5px) scale(1.12);z-index:21;box-shadow:0 0 0 3px var(--line),0 10px 22px rgba(20,35,70,.28)}
+input#mercedes:checked ~ footer .c-mercedes,
+input#ferrari:checked ~ footer .c-ferrari,
+input#redbull:checked ~ footer .c-redbull,
+input#mclaren:checked ~ footer .c-mclaren,
+input#astonmartin:checked ~ footer .c-astonmartin,
+input#alpine:checked ~ footer .c-alpine,
+input#williams:checked ~ footer .c-williams,
+input#rb:checked ~ footer .c-rb,
+input#audi:checked ~ footer .c-audi,
+input#haas:checked ~ footer .c-haas,
+input#cadillac:checked ~ footer .c-cadillac{display:flex}
+footer .team-circle:nth-of-type(1){z-index:11}
+footer .team-circle:nth-of-type(2){z-index:10}
+footer .team-circle:nth-of-type(3){z-index:9}
+footer .team-circle:nth-of-type(4){z-index:8}
+footer .team-circle:nth-of-type(5){z-index:7}
+footer .team-circle:nth-of-type(6){z-index:6}
+footer .team-circle:nth-of-type(7){z-index:5}
+footer .team-circle:nth-of-type(8){z-index:4}
+footer .team-circle:nth-of-type(9){z-index:3}
+footer .team-circle:nth-of-type(10){z-index:2}
+footer .team-circle:nth-of-type(11){z-index:1}
+#mercedes-page .fr1{background-image:url('images/f1-mercedes-w17-2026-01.jpg')}
+#mercedes-page .fr2{background-image:url('images/f1-mercedes-w17-2026-02.jpg')}
+#mercedes-page .fr3{background-image:url('images/f1-mercedes-w17-2026-03.jpg')}
+#mercedes-page .fr4{background-image:url('images/f1-mercedes-w17-2026-04.jpg')}
+#mercedes-page .fr5{background-image:url('images/f1-mercedes-w17-2026-05.jpg')}
+#mercedes-page .fr6{background-image:url('images/f1-mercedes-w17-2026-06.jpg')}
+#mercedes-page .fr7{background-image:url('images/f1-mercedes-w17-2026-07.jpg')}
+#mercedes-page .fr8{background-image:url('images/f1-mercedes-w17-2026-08.jpg')}
+#mercedes-page .fr9{background-image:url('images/f1-mercedes-w17-2026-09.jpg')}
+#mercedes-page .fr10{background-image:url('images/f1-mercedes-w17-2026-10.jpg')}
+#mercedes-page .fr11{background-image:url('images/f1-mercedes-w17-2026-11.jpg')}
+#mercedes-page .fr12{background-image:url('images/f1-mercedes-w17-2026-12.jpg')}
+#mercedes-page .fr13{background-image:url('images/f1-mercedes-w17-2026-13.jpg')}
+#mercedes-page .fr14{background-image:url('images/f1-mercedes-w17-2026-14.jpg')}
+#mercedes-page .fr15{background-image:url('images/f1-mercedes-w17-2026-15.jpg')}
+#mercedes-page .fr16{background-image:url('images/f1-mercedes-w17-2026-16.jpg')}
+#mercedes-page .fr17{background-image:url('images/f1-mercedes-w17-2026-17.jpg')}
+#mercedes-page .fr18{background-image:url('images/f1-mercedes-w17-2026-18.jpg')}
+#mercedes-page .fr19{background-image:url('images/f1-mercedes-w17-2026-19.jpg')}
+#mercedes-page .fr20{background-image:url('images/f1-mercedes-w17-2026-20.jpg')}
+#ferrari-page .fr1{background-image:url('images/f1-ferrari-sf-26-2026-01.jpg')}
+#ferrari-page .fr2{background-image:url('images/f1-ferrari-sf-26-2026-02.jpg')}
+#ferrari-page .fr3{background-image:url('images/f1-ferrari-sf-26-2026-03.jpg')}
+#ferrari-page .fr4{background-image:url('images/f1-ferrari-sf-26-2026-04.jpg')}
+#ferrari-page .fr5{background-image:url('images/f1-ferrari-sf-26-2026-05.jpg')}
+#ferrari-page .fr6{background-image:url('images/f1-ferrari-sf-26-2026-06.jpg')}
+#ferrari-page .fr7{background-image:url('images/f1-ferrari-sf-26-2026-07.jpg')}
+#ferrari-page .fr8{background-image:url('images/f1-ferrari-sf-26-2026-08.jpg')}
+#ferrari-page .fr9{background-image:url('images/f1-ferrari-sf-26-2026-09.jpg')}
+#ferrari-page .fr10{background-image:url('images/f1-ferrari-sf-26-2026-10.jpg')}
+#ferrari-page .fr11{background-image:url('images/f1-ferrari-sf-26-2026-11.jpg')}
+#ferrari-page .fr12{background-image:url('images/f1-ferrari-sf-26-2026-12.jpg')}
+#ferrari-page .fr13{background-image:url('images/f1-ferrari-sf-26-2026-13.jpg')}
+#ferrari-page .fr14{background-image:url('images/f1-ferrari-sf-26-2026-14.jpg')}
+#ferrari-page .fr15{background-image:url('images/f1-ferrari-sf-26-2026-15.jpg')}
+#ferrari-page .fr16{background-image:url('images/f1-ferrari-sf-26-2026-16.jpg')}
+#ferrari-page .fr17{background-image:url('images/f1-ferrari-sf-26-2026-17.jpg')}
+#ferrari-page .fr18{background-image:url('images/f1-ferrari-sf-26-2026-18.jpg')}
+#ferrari-page .fr19{background-image:url('images/f1-ferrari-sf-26-2026-19.jpg')}
+#ferrari-page .fr20{background-image:url('images/f1-ferrari-sf-26-2026-20.jpg')}
+#redbull-page .fr1{background-image:url('images/f1-red-bull-rb22-2026-01.jpg')}
+#redbull-page .fr2{background-image:url('images/f1-red-bull-rb22-2026-02.jpg')}
+#redbull-page .fr3{background-image:url('images/f1-red-bull-rb22-2026-03.jpg')}
+#redbull-page .fr4{background-image:url('images/f1-red-bull-rb22-2026-04.jpg')}
+#redbull-page .fr5{background-image:url('images/f1-red-bull-rb22-2026-05.jpg')}
+#redbull-page .fr6{background-image:url('images/f1-red-bull-rb22-2026-06.jpg')}
+#redbull-page .fr7{background-image:url('images/f1-red-bull-rb22-2026-07.jpg')}
+#redbull-page .fr8{background-image:url('images/f1-red-bull-rb22-2026-08.jpg')}
+#redbull-page .fr9{background-image:url('images/f1-red-bull-rb22-2026-09.jpg')}
+#redbull-page .fr10{background-image:url('images/f1-red-bull-rb22-2026-10.jpg')}
+#redbull-page .fr11{background-image:url('images/f1-red-bull-rb22-2026-11.jpg')}
+#redbull-page .fr12{background-image:url('images/f1-red-bull-rb22-2026-12.jpg')}
+#redbull-page .fr13{background-image:url('images/f1-red-bull-rb22-2026-13.jpg')}
+#redbull-page .fr14{background-image:url('images/f1-red-bull-rb22-2026-14.jpg')}
+#redbull-page .fr15{background-image:url('images/f1-red-bull-rb22-2026-15.jpg')}
+#redbull-page .fr16{background-image:url('images/f1-red-bull-rb22-2026-16.jpg')}
+#redbull-page .fr17{background-image:url('images/f1-red-bull-rb22-2026-17.jpg')}
+#redbull-page .fr18{background-image:url('images/f1-red-bull-rb22-2026-18.jpg')}
+#redbull-page .fr19{background-image:url('images/f1-red-bull-rb22-2026-19.jpg')}
+#redbull-page .fr20{background-image:url('images/f1-red-bull-rb22-2026-20.jpg')}
+#mclaren-page .fr1{background-image:url('images/f1-mclaren-mcl40-2026-01.jpg')}
+#mclaren-page .fr2{background-image:url('images/f1-mclaren-mcl40-2026-02.jpg')}
+#mclaren-page .fr3{background-image:url('images/f1-mclaren-mcl40-2026-03.jpg')}
+#mclaren-page .fr4{background-image:url('images/f1-mclaren-mcl40-2026-04.jpg')}
+#mclaren-page .fr5{background-image:url('images/f1-mclaren-mcl40-2026-05.jpg')}
+#mclaren-page .fr6{background-image:url('images/f1-mclaren-mcl40-2026-06.jpg')}
+#mclaren-page .fr7{background-image:url('images/f1-mclaren-mcl40-2026-07.jpg')}
+#mclaren-page .fr8{background-image:url('images/f1-mclaren-mcl40-2026-08.jpg')}
+#mclaren-page .fr9{background-image:url('images/f1-mclaren-mcl40-2026-09.jpg')}
+#mclaren-page .fr10{background-image:url('images/f1-mclaren-mcl40-2026-10.jpg')}
+#mclaren-page .fr11{background-image:url('images/f1-mclaren-mcl40-2026-11.jpg')}
+#mclaren-page .fr12{background-image:url('images/f1-mclaren-mcl40-2026-12.jpg')}
+#mclaren-page .fr13{background-image:url('images/f1-mclaren-mcl40-2026-13.jpg')}
+#mclaren-page .fr14{background-image:url('images/f1-mclaren-mcl40-2026-14.jpg')}
+#mclaren-page .fr15{background-image:url('images/f1-mclaren-mcl40-2026-15.jpg')}
+#mclaren-page .fr16{background-image:url('images/f1-mclaren-mcl40-2026-16.jpg')}
+#mclaren-page .fr17{background-image:url('images/f1-mclaren-mcl40-2026-17.jpg')}
+#mclaren-page .fr18{background-image:url('images/f1-mclaren-mcl40-2026-18.jpg')}
+#mclaren-page .fr19{background-image:url('images/f1-mclaren-mcl40-2026-19.jpg')}
+#mclaren-page .fr20{background-image:url('images/f1-mclaren-mcl40-2026-20.jpg')}
+#astonmartin-page .fr1{background-image:url('images/f1-aston-martin-amr26-2026-01.jpg')}
+#astonmartin-page .fr2{background-image:url('images/f1-aston-martin-amr26-2026-02.jpg')}
+#astonmartin-page .fr3{background-image:url('images/f1-aston-martin-amr26-2026-03.jpg')}
+#astonmartin-page .fr4{background-image:url('images/f1-aston-martin-amr26-2026-04.jpg')}
+#astonmartin-page .fr5{background-image:url('images/f1-aston-martin-amr26-2026-05.jpg')}
+#astonmartin-page .fr6{background-image:url('images/f1-aston-martin-amr26-2026-06.jpg')}
+#astonmartin-page .fr7{background-image:url('images/f1-aston-martin-amr26-2026-07.jpg')}
+#astonmartin-page .fr8{background-image:url('images/f1-aston-martin-amr26-2026-08.jpg')}
+#astonmartin-page .fr9{background-image:url('images/f1-aston-martin-amr26-2026-09.jpg')}
+#astonmartin-page .fr10{background-image:url('images/f1-aston-martin-amr26-2026-10.jpg')}
+#astonmartin-page .fr11{background-image:url('images/f1-aston-martin-amr26-2026-11.jpg')}
+#astonmartin-page .fr12{background-image:url('images/f1-aston-martin-amr26-2026-12.jpg')}
+#astonmartin-page .fr13{background-image:url('images/f1-aston-martin-amr26-2026-13.jpg')}
+#astonmartin-page .fr14{background-image:url('images/f1-aston-martin-amr26-2026-14.jpg')}
+#astonmartin-page .fr15{background-image:url('images/f1-aston-martin-amr26-2026-15.jpg')}
+#astonmartin-page .fr16{background-image:url('images/f1-aston-martin-amr26-2026-16.jpg')}
+#astonmartin-page .fr17{background-image:url('images/f1-aston-martin-amr26-2026-17.jpg')}
+#astonmartin-page .fr18{background-image:url('images/f1-aston-martin-amr26-2026-18.jpg')}
+#astonmartin-page .fr19{background-image:url('images/f1-aston-martin-amr26-2026-19.jpg')}
+#astonmartin-page .fr20{background-image:url('images/f1-aston-martin-amr26-2026-20.jpg')}
+#alpine-page .fr1{background-image:url('images/f1-alpine-a526-2026-01.jpg')}
+#alpine-page .fr2{background-image:url('images/f1-alpine-a526-2026-02.jpg')}
+#alpine-page .fr3{background-image:url('images/f1-alpine-a526-2026-03.jpg')}
+#alpine-page .fr4{background-image:url('images/f1-alpine-a526-2026-04.jpg')}
+#alpine-page .fr5{background-image:url('images/f1-alpine-a526-2026-05.jpg')}
+#alpine-page .fr6{background-image:url('images/f1-alpine-a526-2026-06.jpg')}
+#alpine-page .fr7{background-image:url('images/f1-alpine-a526-2026-07.jpg')}
+#alpine-page .fr8{background-image:url('images/f1-alpine-a526-2026-08.jpg')}
+#alpine-page .fr9{background-image:url('images/f1-alpine-a526-2026-09.jpg')}
+#alpine-page .fr10{background-image:url('images/f1-alpine-a526-2026-10.jpg')}
+#alpine-page .fr11{background-image:url('images/f1-alpine-a526-2026-11.jpg')}
+#alpine-page .fr12{background-image:url('images/f1-alpine-a526-2026-12.jpg')}
+#alpine-page .fr13{background-image:url('images/f1-alpine-a526-2026-13.jpg')}
+#alpine-page .fr14{background-image:url('images/f1-alpine-a526-2026-14.jpg')}
+#alpine-page .fr15{background-image:url('images/f1-alpine-a526-2026-15.jpg')}
+#alpine-page .fr16{background-image:url('images/f1-alpine-a526-2026-16.jpg')}
+#alpine-page .fr17{background-image:url('images/f1-alpine-a526-2026-17.jpg')}
+#alpine-page .fr18{background-image:url('images/f1-alpine-a526-2026-18.jpg')}
+#alpine-page .fr19{background-image:url('images/f1-alpine-a526-2026-19.jpg')}
+#alpine-page .fr20{background-image:url('images/f1-alpine-a526-2026-20.jpg')}
+#williams-page .fr1{background-image:url('images/f1-williams-fw48-2026-01.jpg')}
+#williams-page .fr2{background-image:url('images/f1-williams-fw48-2026-02.jpg')}
+#williams-page .fr3{background-image:url('images/f1-williams-fw48-2026-03.jpg')}
+#williams-page .fr4{background-image:url('images/f1-williams-fw48-2026-04.jpg')}
+#williams-page .fr5{background-image:url('images/f1-williams-fw48-2026-05.jpg')}
+#williams-page .fr6{background-image:url('images/f1-williams-fw48-2026-06.jpg')}
+#williams-page .fr7{background-image:url('images/f1-williams-fw48-2026-07.jpg')}
+#williams-page .fr8{background-image:url('images/f1-williams-fw48-2026-08.jpg')}
+#williams-page .fr9{background-image:url('images/f1-williams-fw48-2026-09.jpg')}
+#williams-page .fr10{background-image:url('images/f1-williams-fw48-2026-10.jpg')}
+#williams-page .fr11{background-image:url('images/f1-williams-fw48-2026-11.jpg')}
+#williams-page .fr12{background-image:url('images/f1-williams-fw48-2026-12.jpg')}
+#williams-page .fr13{background-image:url('images/f1-williams-fw48-2026-13.jpg')}
+#williams-page .fr14{background-image:url('images/f1-williams-fw48-2026-14.jpg')}
+#williams-page .fr15{background-image:url('images/f1-williams-fw48-2026-15.jpg')}
+#williams-page .fr16{background-image:url('images/f1-williams-fw48-2026-16.jpg')}
+#williams-page .fr17{background-image:url('images/f1-williams-fw48-2026-17.jpg')}
+#williams-page .fr18{background-image:url('images/f1-williams-fw48-2026-18.jpg')}
+#williams-page .fr19{background-image:url('images/f1-williams-fw48-2026-19.jpg')}
+#williams-page .fr20{background-image:url('images/f1-williams-fw48-2026-20.jpg')}
+#rb-page .fr1{background-image:url('images/f1-racing-bulls-vcarb-03-2026-01.jpg')}
+#rb-page .fr2{background-image:url('images/f1-racing-bulls-vcarb-03-2026-02.jpg')}
+#rb-page .fr3{background-image:url('images/f1-racing-bulls-vcarb-03-2026-03.jpg')}
+#rb-page .fr4{background-image:url('images/f1-racing-bulls-vcarb-03-2026-04.jpg')}
+#rb-page .fr5{background-image:url('images/f1-racing-bulls-vcarb-03-2026-05.jpg')}
+#rb-page .fr6{background-image:url('images/f1-racing-bulls-vcarb-03-2026-06.jpg')}
+#rb-page .fr7{background-image:url('images/f1-racing-bulls-vcarb-03-2026-07.jpg')}
+#rb-page .fr8{background-image:url('images/f1-racing-bulls-vcarb-03-2026-08.jpg')}
+#rb-page .fr9{background-image:url('images/f1-racing-bulls-vcarb-03-2026-09.jpg')}
+#rb-page .fr10{background-image:url('images/f1-racing-bulls-vcarb-03-2026-10.jpg')}
+#rb-page .fr11{background-image:url('images/f1-racing-bulls-vcarb-03-2026-11.jpg')}
+#rb-page .fr12{background-image:url('images/f1-racing-bulls-vcarb-03-2026-12.jpg')}
+#rb-page .fr13{background-image:url('images/f1-racing-bulls-vcarb-03-2026-13.jpg')}
+#rb-page .fr14{background-image:url('images/f1-racing-bulls-vcarb-03-2026-14.jpg')}
+#rb-page .fr15{background-image:url('images/f1-racing-bulls-vcarb-03-2026-15.jpg')}
+#rb-page .fr16{background-image:url('images/f1-racing-bulls-vcarb-03-2026-16.jpg')}
+#rb-page .fr17{background-image:url('images/f1-racing-bulls-vcarb-03-2026-17.jpg')}
+#rb-page .fr18{background-image:url('images/f1-racing-bulls-vcarb-03-2026-18.jpg')}
+#rb-page .fr19{background-image:url('images/f1-racing-bulls-vcarb-03-2026-19.jpg')}
+#rb-page .fr20{background-image:url('images/f1-racing-bulls-vcarb-03-2026-20.jpg')}
+#audi-page .fr1{background-image:url('images/f1-audi-r26-2026-01.jpg')}
+#audi-page .fr2{background-image:url('images/f1-audi-r26-2026-02.jpg')}
+#audi-page .fr3{background-image:url('images/f1-audi-r26-2026-03.jpg')}
+#audi-page .fr4{background-image:url('images/f1-audi-r26-2026-04.jpg')}
+#audi-page .fr5{background-image:url('images/f1-audi-r26-2026-05.jpg')}
+#audi-page .fr6{background-image:url('images/f1-audi-r26-2026-06.jpg')}
+#audi-page .fr7{background-image:url('images/f1-audi-r26-2026-07.jpg')}
+#audi-page .fr8{background-image:url('images/f1-audi-r26-2026-08.jpg')}
+#audi-page .fr9{background-image:url('images/f1-audi-r26-2026-09.jpg')}
+#audi-page .fr10{background-image:url('images/f1-audi-r26-2026-10.jpg')}
+#audi-page .fr11{background-image:url('images/f1-audi-r26-2026-11.jpg')}
+#audi-page .fr12{background-image:url('images/f1-audi-r26-2026-12.jpg')}
+#audi-page .fr13{background-image:url('images/f1-audi-r26-2026-13.jpg')}
+#audi-page .fr14{background-image:url('images/f1-audi-r26-2026-14.jpg')}
+#audi-page .fr15{background-image:url('images/f1-audi-r26-2026-15.jpg')}
+#audi-page .fr16{background-image:url('images/f1-audi-r26-2026-16.jpg')}
+#audi-page .fr17{background-image:url('images/f1-audi-r26-2026-17.jpg')}
+#audi-page .fr18{background-image:url('images/f1-audi-r26-2026-18.jpg')}
+#audi-page .fr19{background-image:url('images/f1-audi-r26-2026-19.jpg')}
+#audi-page .fr20{background-image:url('images/f1-audi-r26-2026-20.jpg')}
+#haas-page .fr1{background-image:url('images/f1-haas-vf-26-2026-01.jpg')}
+#haas-page .fr2{background-image:url('images/f1-haas-vf-26-2026-02.jpg')}
+#haas-page .fr3{background-image:url('images/f1-haas-vf-26-2026-03.jpg')}
+#haas-page .fr4{background-image:url('images/f1-haas-vf-26-2026-04.jpg')}
+#haas-page .fr5{background-image:url('images/f1-haas-vf-26-2026-05.jpg')}
+#haas-page .fr6{background-image:url('images/f1-haas-vf-26-2026-06.jpg')}
+#haas-page .fr7{background-image:url('images/f1-haas-vf-26-2026-07.jpg')}
+#haas-page .fr8{background-image:url('images/f1-haas-vf-26-2026-08.jpg')}
+#haas-page .fr9{background-image:url('images/f1-haas-vf-26-2026-09.jpg')}
+#haas-page .fr10{background-image:url('images/f1-haas-vf-26-2026-10.jpg')}
+#haas-page .fr11{background-image:url('images/f1-haas-vf-26-2026-11.jpg')}
+#haas-page .fr12{background-image:url('images/f1-haas-vf-26-2026-12.jpg')}
+#haas-page .fr13{background-image:url('images/f1-haas-vf-26-2026-13.jpg')}
+#haas-page .fr14{background-image:url('images/f1-haas-vf-26-2026-14.jpg')}
+#haas-page .fr15{background-image:url('images/f1-haas-vf-26-2026-15.jpg')}
+#haas-page .fr16{background-image:url('images/f1-haas-vf-26-2026-16.jpg')}
+#haas-page .fr17{background-image:url('images/f1-haas-vf-26-2026-17.jpg')}
+#haas-page .fr18{background-image:url('images/f1-haas-vf-26-2026-18.jpg')}
+#haas-page .fr19{background-image:url('images/f1-haas-vf-26-2026-19.jpg')}
+#haas-page .fr20{background-image:url('images/f1-haas-vf-26-2026-20.jpg')}
+#cadillac-page .fr1{background-image:url('images/f1-cadillac-team-2026-01.jpg')}
+#cadillac-page .fr2{background-image:url('images/f1-cadillac-team-2026-02.jpg')}
+#cadillac-page .fr3{background-image:url('images/f1-cadillac-team-2026-03.jpg')}
+#cadillac-page .fr4{background-image:url('images/f1-cadillac-team-2026-04.jpg')}
+#cadillac-page .fr5{background-image:url('images/f1-cadillac-team-2026-05.jpg')}
+#cadillac-page .fr6{background-image:url('images/f1-cadillac-team-2026-06.jpg')}
+#cadillac-page .fr7{background-image:url('images/f1-cadillac-team-2026-07.jpg')}
+#cadillac-page .fr8{background-image:url('images/f1-cadillac-team-2026-08.jpg')}
+#cadillac-page .fr9{background-image:url('images/f1-cadillac-team-2026-09.jpg')}
+#cadillac-page .fr10{background-image:url('images/f1-cadillac-team-2026-10.jpg')}
+#cadillac-page .fr11{background-image:url('images/f1-cadillac-team-2026-11.jpg')}
+#cadillac-page .fr12{background-image:url('images/f1-cadillac-team-2026-12.jpg')}
+#cadillac-page .fr13{background-image:url('images/f1-cadillac-team-2026-13.jpg')}
+#cadillac-page .fr14{background-image:url('images/f1-cadillac-team-2026-14.jpg')}
+#cadillac-page .fr15{background-image:url('images/f1-cadillac-team-2026-15.jpg')}
+#cadillac-page .fr16{background-image:url('images/f1-cadillac-team-2026-16.jpg')}
+#cadillac-page .fr17{background-image:url('images/f1-cadillac-team-2026-17.jpg')}
+#cadillac-page .fr18{background-image:url('images/f1-cadillac-team-2026-18.jpg')}
+#cadillac-page .fr19{background-image:url('images/f1-cadillac-team-2026-19.jpg')}
+#cadillac-page .fr20{background-image:url('images/f1-cadillac-team-2026-20.jpg')}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:1100px){
+ .page-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .car-view{grid-column:1/-1;order:-1}
+ .track-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+}
+@media (max-width:720px){
+ body{padding-top:14px}
+ header{margin-bottom:10px}
+ .logo{height:42px;padding:4px 8px}
+ .driver-standing{padding:8px 12px;gap:10px}
+ .driver-standing h3{font-size:14px}
+ .driver-icon{width:34px;height:34px}
+ .page-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+ .team-info{padding:16px 4px}
+ .team-info h2{font-size:19px}
+ .team-info p{font-size:14px}
+ .tracks{padding:10px 4px}
+ .track-grid{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+ .t-role{font-size:10px}
+ .track strong{font-size:13px}
+ .t-sub{font-size:11px}
+ .hint{font-size:11.5px}
+ .standings{padding:14px 4px}
+ th,td{padding:9px 6px;font-size:13px}
+ th{font-size:10px;letter-spacing:.08em}
+ th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}
+ .nm{white-space:normal;line-height:1.2}
+ .avatar{width:26px;height:26px;font-size:10px}
+ .who{gap:8px}
+ .tm{white-space:normal;line-height:1.2}
+ .cons-row{grid-template-columns:22px 92px 1fr 44px;gap:8px}
+ .cons-name{font-size:13px}
+}
+@media (max-width:480px){
+ .avatar{display:none}
+ .dot{margin-right:5px}
+ .pos{width:22px}
+ .cons-row{grid-template-columns:20px 84px 1fr 38px}
+ .z::after{font-size:10px;padding:3px 7px}
+}
+@media (max-width:360px){
+ th:nth-child(6),td:nth-child(6){display:none}
+}
+@media (min-width:1800px){ body{font-size:17px} }
+
+
+/* ===== TITLES: hover card + champion trophies ===== */
+.table-wrap{overflow:visible}
+.who{position:relative;outline:none}
+.who .nm{cursor:default}
+.ti{height:22px;width:auto;flex:0 0 auto;display:inline-block;filter:drop-shadow(0 1px 2px rgba(20,35,70,.25))}
+.cons-name{display:inline-flex;align-items:center;gap:6px}
+.tip{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:40;min-width:150px;max-width:min(320px,86vw);padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.97);border:1px solid var(--line);box-shadow:var(--shadow);flex-direction:column;gap:8px;font-weight:500;white-space:normal;cursor:default;animation:fade .18s ease}
+.who:hover .tip,.who:focus-within .tip,.who:focus .tip{display:flex}
+.tip-cap{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.tip-row{display:flex;flex-wrap:wrap;gap:10px}
+.tip-row figure{display:flex;flex-direction:column;align-items:center;gap:3px;margin:0}
+.tip-row img{height:34px;width:auto;display:block;filter:drop-shadow(0 1px 2px rgba(20,35,70,.22))}
+.tip-row figcaption{font-size:10.5px;color:var(--ink-soft);font-weight:500}
+@media (max-width:720px){.ti{height:18px}}
+</style>
+</head>
+<body>
+
+<input type="radio" id="mercedes" name="team" checked>
+<input type="radio" id="ferrari" name="team">
+<input type="radio" id="redbull" name="team">
+<input type="radio" id="mclaren" name="team">
+<input type="radio" id="astonmartin" name="team">
+<input type="radio" id="alpine" name="team">
+<input type="radio" id="williams" name="team">
+<input type="radio" id="rb" name="team">
+<input type="radio" id="audi" name="team">
+<input type="radio" id="haas" name="team">
+<input type="radio" id="cadillac" name="team">
+<input type="radio" id="standings" name="team">
+
+<header>
+<label for="mercedes" class="logo" title="Back to Mercedes (home)">
+    <img src="images/wp8757596-removebg-preview.png" alt="F1 Logo">
+</label>
+
+    <label for="standings" class="driver-standing">
+        <span class="driver-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20v-5M10 20V9M16 20v-8M22 20V5"/></svg>
+        </span>
+        <h3>Driver Standings</h3>
+    </label>
+</header>
+
+<div class="pages">
+
+    <section id="mercedes-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Mercedes-AMG Petronas F1 Team</h2>
+                <p>Nine constructors' titles, the ninth clinched at the São Paulo Grand Prix with three rounds to spare. Kimi Antonelli has also won the drivers' title, making him Formula 1's youngest-ever champion, and Mercedes have won twelve of the first twenty races.</p>
+                <div class="meta">
+                    <span class="pill">Brackley &middot; UK</span>
+                    <span class="pill">652 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Mercedes W17</h1>
+                <div class="stage">
+                    <span class="ghost">Mercedes</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Brackley is 25 minutes up the road from the circuit">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race for the new world champion">
+                        <span class="t-role">Antonelli &middot; Italy</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 54 36 14c4-6 12-6 16 0l18 30c4 6 12 6 16 0l16-26c4-7 14-1 10 6L94 54c-4 7-14 7-18 0L58 26c-4-6-12-6-16 0L22 58c-4 7-14 3-10-4z"/></svg>
+                        <strong>Autodromo Nazionale Monza</strong>
+                        <span class="t-sub">Italian Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race, where he finished second in 2026">
+                        <span class="t-role">Russell &middot; United Kingdom</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="ferrari-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Scuderia Ferrari</h2>
+                <p>The oldest team on the grid and the most decorated, with sixteen constructors' titles. Second in 2026 with Lewis Hamilton and Charles Leclerc, one win each so far, and 95 points clear of Red Bull.</p>
+                <div class="meta">
+                    <span class="pill">Maranello &middot; Italy</span>
+                    <span class="pill">510 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Ferrari SF-26</h1>
+                <div class="stage">
+                    <span class="ghost">Ferrari</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="The tifosi's race, 200km from Maranello">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 54 36 14c4-6 12-6 16 0l18 30c4 6 12 6 16 0l16-26c4-7 14-1 10 6L94 54c-4 7-14 7-18 0L58 26c-4-6-12-6-16 0L22 58c-4 7-14 3-10-4z"/></svg>
+                        <strong>Autodromo Nazionale Monza</strong>
+                        <span class="t-sub">Italian Grand Prix</span>
+                    </div>
+                    <div class="track" title="Nine-time winner at his home race">
+                        <span class="t-role">Hamilton &middot; United Kingdom</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="He grew up on these streets">
+                        <span class="t-role">Leclerc &middot; Monaco</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M20 52c-6-8-2-20 8-24l30-12c8-3 16 2 16 10v8c0 6 6 8 12 8h14c8 0 10 12 2 14l-58 8c-10 2-18-4-24-12z"/></svg>
+                        <strong>Circuit de Monaco</strong>
+                        <span class="t-sub">Monaco Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="redbull-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Oracle Red Bull Racing</h2>
+                <p>Six constructors' titles and a strong second half to 2026: Max Verstappen has won three of the last five races, was second at São Paulo, and Red Bull are now third in the standings.</p>
+                <div class="meta">
+                    <span class="pill">Milton Keynes &middot; UK</span>
+                    <span class="pill">415 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Red Bull RB22</h1>
+                <div class="stage">
+                    <span class="ghost">Red Bull</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Owned by the team; Milton Keynes is the factory">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M20 50c-8-10 0-24 12-28 14-4 20 6 32 4s22-10 28 0-4 22-16 26-24-2-34 2-16 4-22-4z"/></svg>
+                        <strong>Red Bull Ring</strong>
+                        <span class="t-sub">Austrian Grand Prix</span>
+                    </div>
+                    <div class="track" title="The final Dutch Grand Prix; he crashed out in 2026">
+                        <span class="t-role">Verstappen &middot; Netherlands</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 48c-4-14 6-30 22-32 18-2 22 12 34 14s18-10 26-2-2 22-14 26-22-2-32 4-18 12-26 10-8-12-10-20z"/></svg>
+                        <strong>Circuit Zandvoort</strong>
+                        <span class="t-sub">Dutch Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No French round in 2026 &mdash; Monaco is the nearest">
+                        <span class="t-role">Hadjar &middot; France</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M20 52c-6-8-2-20 8-24l30-12c8-3 16 2 16 10v8c0 6 6 8 12 8h14c8 0 10 12 2 14l-58 8c-10 2-18-4-24-12z"/></svg>
+                        <strong>Circuit de Monaco</strong>
+                        <span class="t-sub">Monaco Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="mclaren-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>McLaren F1 Team</h2>
+                <p>Back-to-back champions in 2024 and 2025, fourth in 2026. Lando Norris has three wins, the latest at São Paulo, while Oscar Piastri is still chasing his first of the year.</p>
+                <div class="meta">
+                    <span class="pill">Woking &middot; UK</span>
+                    <span class="pill">398 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>McLaren MCL40</h1>
+                <div class="stage">
+                    <span class="ghost">McLaren</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Woking to Silverstone, the classic British GP run">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race for the team's points leader">
+                        <span class="t-role">Norris &middot; United Kingdom</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="Crashed on a recon lap here in 2026">
+                        <span class="t-role">Piastri &middot; Australia</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M18 34c0-12 12-20 26-20h34c14 0 22 10 20 22-2 14-14 18-28 18H40c-14 0-22-8-22-20z"/></svg>
+                        <strong>Albert Park</strong>
+                        <span class="t-sub">Australian Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="astonmartin-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Aston Martin Aramco F1 Team</h2>
+                <p>A brand-new factory and wind tunnel at Silverstone, but a bruising 2026: seven points all season, every one of them Fernando Alonso's.</p>
+                <div class="meta">
+                    <span class="pill">Silverstone &middot; UK</span>
+                    <span class="pill">7 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Aston Martin AMR26</h1>
+                <div class="stage">
+                    <span class="ghost">Aston Martin</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="The factory sits across the road from the track">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="Madrid's first Grand Prix, new for 2026">
+                        <span class="t-role">Alonso &middot; Spain</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 30c8-14 30-18 44-12 12 6 12 18 24 20s18 14 8 20-28 2-40-2-28-4-34-12-6-10-2-14z"/></svg>
+                        <strong>Madring</strong>
+                        <span class="t-sub">Spanish Grand Prix (Madrid)</span>
+                    </div>
+                    <div class="track" title="Home race for the Montreal-born driver">
+                        <span class="t-role">Stroll &middot; Canada</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 26c16-8 38-10 56-6 14 4 18 16 12 26-6 12-22 14-36 12s-28-6-34-14 0-16 2-18z"/></svg>
+                        <strong>Circuit Gilles Villeneuve</strong>
+                        <span class="t-sub">Canadian Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="alpine-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>BWT Alpine F1 Team</h2>
+                <p>Renault's sporting brand, two constructors' titles under the Renault name in 2005 and 2006. Sixth in 2026, with Pierre Gasly taking a first career pole at Monza and Franco Colapinto alongside him.</p>
+                <div class="meta">
+                    <span class="pill">Enstone &middot; UK / France</span>
+                    <span class="pill">69 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Alpine A526</h1>
+                <div class="stage">
+                    <span class="ghost">Alpine</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="French brand, English factory at Enstone">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No French round in 2026 &mdash; Monaco is the nearest">
+                        <span class="t-role">Gasly &middot; France</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M20 52c-6-8-2-20 8-24l30-12c8-3 16 2 16 10v8c0 6 6 8 12 8h14c8 0 10 12 2 14l-58 8c-10 2-18-4-24-12z"/></svg>
+                        <strong>Circuit de Monaco</strong>
+                        <span class="t-sub">Monaco Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No Argentine round &mdash; São Paulo is the closest">
+                        <span class="t-role">Colapinto &middot; Argentina</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M22 20c14-8 40-8 56 0 14 8 18 22 8 30-12 10-30 4-40 10s-24 6-28-4 0-30 4-36z"/></svg>
+                        <strong>Interlagos</strong>
+                        <span class="t-sub">São Paulo Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="williams-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Williams Racing</h2>
+                <p>Nine constructors' titles in the bank, but a thin 2026: twelve points, with Carlos Sainz and Alex Albon spending too much of the year outside the top fifteen.</p>
+                <div class="meta">
+                    <span class="pill">Grove &middot; UK</span>
+                    <span class="pill">12 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Williams FW48</h1>
+                <div class="stage">
+                    <span class="ghost">Williams</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Grove is 30 minutes from the circuit">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                    <div class="track" title="Madrid, his home city, joins the calendar">
+                        <span class="t-role">Sainz &middot; Spain</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 30c8-14 30-18 44-12 12 6 12 18 24 20s18 14 8 20-28 2-40-2-28-4-34-12-6-10-2-14z"/></svg>
+                        <strong>Madring</strong>
+                        <span class="t-sub">Spanish Grand Prix (Madrid)</span>
+                    </div>
+                    <div class="track dim" title="No Thai round &mdash; Singapore is the nearest">
+                        <span class="t-role">Albon &middot; Thailand</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 34c0-10 10-16 22-16h48c12 0 18 8 16 18s-12 14-24 14H38c-14 0-24-6-24-16z"/></svg>
+                        <strong>Marina Bay</strong>
+                        <span class="t-sub">Singapore Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="rb-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Visa Cash App RB F1 Team</h2>
+                <p>Red Bull's junior team and the surprise of the midfield in 2026, fifth overall by a distance. Liam Lawson has been the pick of the drivers, with rookie Arvid Lindblad scoring regularly.</p>
+                <div class="meta">
+                    <span class="pill">Faenza &middot; Italy</span>
+                    <span class="pill">114 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>RB VCARB 03</h1>
+                <div class="stage">
+                    <span class="ghost">Racing Bulls</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Faenza's home race now Imola is off the calendar">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 54 36 14c4-6 12-6 16 0l18 30c4 6 12 6 16 0l16-26c4-7 14-1 10 6L94 54c-4 7-14 7-18 0L58 26c-4-6-12-6-16 0L22 58c-4 7-14 3-10-4z"/></svg>
+                        <strong>Autodromo Nazionale Monza</strong>
+                        <span class="t-sub">Italian Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No New Zealand round &mdash; Melbourne is the closest">
+                        <span class="t-role">Lawson &middot; New Zealand</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M18 34c0-12 12-20 26-20h34c14 0 22 10 20 22-2 14-14 18-28 18H40c-14 0-22-8-22-20z"/></svg>
+                        <strong>Albert Park</strong>
+                        <span class="t-sub">Australian Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race for the rookie">
+                        <span class="t-role">Lindblad &middot; United Kingdom</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="audi-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Audi Revolut F1 Team</h2>
+                <p>Audi's first works entry, built on the Hinwil squad it took over from Sauber. Chassis from Hinwil and Bicester, power unit from Neuburg, Nico Hülkenberg and Gabriel Bortoleto driving, and a stated aim of fighting for titles by 2030.</p>
+                <div class="meta">
+                    <span class="pill">Hinwil &middot; Switzerland</span>
+                    <span class="pill">28 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Audi R26</h1>
+                <div class="stage">
+                    <span class="ghost">Audi</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track dim" title="No Swiss round &mdash; Monza is the nearest to Hinwil">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 54 36 14c4-6 12-6 16 0l18 30c4 6 12 6 16 0l16-26c4-7 14-1 10 6L94 54c-4 7-14 7-18 0L58 26c-4-6-12-6-16 0L22 58c-4 7-14 3-10-4z"/></svg>
+                        <strong>Autodromo Nazionale Monza</strong>
+                        <span class="t-sub">Italian Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No German round &mdash; Spa is the closest">
+                        <span class="t-role">Hülkenberg &middot; Germany</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 52c-6-12 4-22 14-30S54 8 68 12s18 16 12 26-16 12-22 20-14 12-24 8-14-8-18-14z"/></svg>
+                        <strong>Spa-Francorchamps</strong>
+                        <span class="t-sub">Belgian Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race for the Brazilian">
+                        <span class="t-role">Bortoleto &middot; Brazil</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M22 20c14-8 40-8 56 0 14 8 18 22 8 30-12 10-30 4-40 10s-24 6-28-4 0-30 4-36z"/></svg>
+                        <strong>Interlagos</strong>
+                        <span class="t-sub">São Paulo Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="haas-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Haas F1 Team</h2>
+                <p>A lean operation split across North Carolina, Banbury and Maranello. Seventh in 2026, with Oliver Bearman carrying most of the points. Esteban Ocon has left, and Ryo Hirakawa and Rafael Camara have both stepped in since.</p>
+                <div class="meta">
+                    <span class="pill">Kannapolis &middot; USA</span>
+                    <span class="pill">31 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Haas VF-26</h1>
+                <div class="stage">
+                    <span class="ghost">Haas</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Closest of the three North American rounds to base">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 44c-2-16 10-28 26-28h38c14 0 22 12 16 24-4 8-14 8-20 14s-18 8-28 4-30-4-32-14z"/></svg>
+                        <strong>Autódromo Hermanos Rodríguez</strong>
+                        <span class="t-sub">Mexico City Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No French round in 2026 &mdash; Spa is the nearest">
+                        <span class="t-role">Ocon &middot; France</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 52c-6-12 4-22 14-30S54 8 68 12s18 16 12 26-16 12-22 20-14 12-24 8-14-8-18-14z"/></svg>
+                        <strong>Spa-Francorchamps</strong>
+                        <span class="t-sub">Belgian Grand Prix</span>
+                    </div>
+                    <div class="track" title="Home race for the Essex driver">
+                        <span class="t-role">Bearman &middot; United Kingdom</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 40c-4-12 8-22 22-22 14 0 18 10 30 10s16-12 30-10 18 14 10 22-20 6-28 12-12 14-24 12-16-8-26-8-10 4-14-16z"/></svg>
+                        <strong>Silverstone</strong>
+                        <span class="t-sub">British Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section id="cadillac-page" class="team-page">
+        <div class="page-grid">
+            <div class="team-info panel">
+                <h2>Cadillac F1 Team</h2>
+                <p>Formula 1's eleventh team and its first all-new entrant in a decade, run by TWG Motorsports with General Motors. Ferrari power until Cadillac's own unit arrives, Sergio Pérez and Valtteri Bottas driving, and no points yet.</p>
+                <div class="meta">
+                    <span class="pill">Indianapolis &middot; USA</span>
+                    <span class="pill">0 pts in 2026</span>
+                </div>
+            </div>
+
+            <div class="car-view">
+                <h1>Cadillac MAC-26</h1>
+                <div class="stage">
+                    <span class="ghost">Cadillac</span>
+                    <label class="z z1" data-n="01 / 20"></label><label class="z z2" data-n="02 / 20"></label><label class="z z3" data-n="03 / 20"></label><label class="z z4" data-n="04 / 20"></label><label class="z z5" data-n="05 / 20"></label><label class="z z6" data-n="06 / 20"></label><label class="z z7" data-n="07 / 20"></label><label class="z z8" data-n="08 / 20"></label><label class="z z9" data-n="09 / 20"></label><label class="z z10" data-n="10 / 20"></label><label class="z z11" data-n="11 / 20"></label><label class="z z12" data-n="12 / 20"></label><label class="z z13" data-n="13 / 20"></label><label class="z z14" data-n="14 / 20"></label><label class="z z15" data-n="15 / 20"></label><label class="z z16" data-n="16 / 20"></label><label class="z z17" data-n="17 / 20"></label><label class="z z18" data-n="18 / 20"></label><label class="z z19" data-n="19 / 20"></label><label class="z z20" data-n="20 / 20"></label>
+                    <span class="fr fr1"></span><span class="fr fr2"></span><span class="fr fr3"></span><span class="fr fr4"></span><span class="fr fr5"></span><span class="fr fr6"></span><span class="fr fr7"></span><span class="fr fr8"></span><span class="fr fr9"></span><span class="fr fr10"></span><span class="fr fr11"></span><span class="fr fr12"></span><span class="fr fr13"></span><span class="fr fr14"></span><span class="fr fr15"></span><span class="fr fr16"></span><span class="fr fr17"></span><span class="fr fr18"></span><span class="fr fr19"></span><span class="fr fr20"></span>
+                </div>
+                <p class="hint">Spinning on its own &middot; hover or drag across to take control</p>
+            </div>
+
+            <div class="tracks panel">
+                <h3>Home Circuits</h3>
+                <div class="track-grid">
+                    <div class="track" title="Nearest round to the Indianapolis and Charlotte bases">
+                        <span class="t-role">Team home</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 44c-2-16 10-28 26-28h38c14 0 22 12 16 24-4 8-14 8-20 14s-18 8-28 4-30-4-32-14z"/></svg>
+                        <strong>Autódromo Hermanos Rodríguez</strong>
+                        <span class="t-sub">Mexico City Grand Prix</span>
+                    </div>
+                    <div class="track" title="The loudest home crowd on the calendar">
+                        <span class="t-role">Pérez &middot; Mexico</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M14 44c-2-16 10-28 26-28h38c14 0 22 12 16 24-4 8-14 8-20 14s-18 8-28 4-30-4-32-14z"/></svg>
+                        <strong>Autódromo Hermanos Rodríguez</strong>
+                        <span class="t-sub">Mexico City Grand Prix</span>
+                    </div>
+                    <div class="track dim" title="No Finnish round &mdash; Spa is the nearest">
+                        <span class="t-role">Bottas &middot; Finland</span>
+                        <svg viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" aria-hidden="true"><path d="M16 52c-6-12 4-22 14-30S54 8 68 12s18 16 12 26-16 12-22 20-14 12-24 8-14-8-18-14z"/></svg>
+                        <strong>Spa-Francorchamps</strong>
+                        <span class="t-sub">Belgian Grand Prix</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="standings-page" class="team-page">
+        <div class="standings panel">
+            <div class="sh">
+                <h2>2026 Driver Standings</h2>
+                <span class="sub">After round 20 of 23, the S&atilde;o Paulo Grand Prix &middot; Antonelli is world champion and Mercedes have the constructors' title &middot; next up Las Vegas on 21 Nov</span>
+            </div>
+            <div class="table-wrap">
+            <table>
+                <thead><tr><th>#</th><th>Driver</th><th>Team</th><th>Nationality</th><th>Age</th><th>Wins</th><th>Pts</th></tr></thead>
+                <tbody>
+            <tr>
+                <td class="pos">1</td>
+                <td><div class="who"><span class="avatar" style="background:#0f8b84">KA</span><span class="nm">Kimi Antonelli</span></div></td>
+                <td class="tm"><span class="dot" style="background:#0f8b84"></span>Mercedes</td>
+                <td class="nat"><span class="flag">🇮🇹</span>Italy</td>
+                <td>20</td>
+                <td>9</td>
+                <td class="pts">390</td>
+            </tr>
+            <tr>
+                <td class="pos">2</td>
+                <td><div class="who"><span class="avatar" style="background:#1b3fcc">MV</span><span class="nm">Max Verstappen</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1b3fcc"></span>Red Bull</td>
+                <td class="nat"><span class="flag">🇳🇱</span>Netherlands</td>
+                <td>29</td>
+                <td>3</td>
+                <td class="pts">279</td>
+            </tr>
+            <tr>
+                <td class="pos">3</td>
+                <td><div class="who"><span class="avatar" style="background:#0f8b84">GR</span><span class="nm">George Russell</span></div></td>
+                <td class="tm"><span class="dot" style="background:#0f8b84"></span>Mercedes</td>
+                <td class="nat"><span class="flag">🇬🇧</span>United Kingdom</td>
+                <td>28</td>
+                <td>3</td>
+                <td class="pts">262</td>
+            </tr>
+            <tr>
+                <td class="pos">4</td>
+                <td><div class="who"><span class="avatar" style="background:#c00000">LH</span><span class="nm">Lewis Hamilton</span></div></td>
+                <td class="tm"><span class="dot" style="background:#c00000"></span>Ferrari</td>
+                <td class="nat"><span class="flag">🇬🇧</span>United Kingdom</td>
+                <td>41</td>
+                <td>1</td>
+                <td class="pts">261</td>
+            </tr>
+            <tr>
+                <td class="pos">5</td>
+                <td><div class="who"><span class="avatar" style="background:#c00000">CL</span><span class="nm">Charles Leclerc</span></div></td>
+                <td class="tm"><span class="dot" style="background:#c00000"></span>Ferrari</td>
+                <td class="nat"><span class="flag">🇲🇨</span>Monaco</td>
+                <td>29</td>
+                <td>1</td>
+                <td class="pts">249</td>
+            </tr>
+            <tr>
+                <td class="pos">6</td>
+                <td><div class="who"><span class="avatar" style="background:#e56a00">LN</span><span class="nm">Lando Norris</span></div></td>
+                <td class="tm"><span class="dot" style="background:#e56a00"></span>McLaren</td>
+                <td class="nat"><span class="flag">🇬🇧</span>United Kingdom</td>
+                <td>27</td>
+                <td>3</td>
+                <td class="pts">246</td>
+            </tr>
+            <tr>
+                <td class="pos">7</td>
+                <td><div class="who"><span class="avatar" style="background:#e56a00">OP</span><span class="nm">Oscar Piastri</span></div></td>
+                <td class="tm"><span class="dot" style="background:#e56a00"></span>McLaren</td>
+                <td class="nat"><span class="flag">🇦🇺</span>Australia</td>
+                <td>25</td>
+                <td>0</td>
+                <td class="pts">152</td>
+            </tr>
+            <tr>
+                <td class="pos">8</td>
+                <td><div class="who"><span class="avatar" style="background:#1b3fcc">IH</span><span class="nm">Isack Hadjar</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1b3fcc"></span>Red Bull</td>
+                <td class="nat"><span class="flag">🇫🇷</span>France</td>
+                <td>22</td>
+                <td>0</td>
+                <td class="pts">122</td>
+            </tr>
+            <tr>
+                <td class="pos">9</td>
+                <td><div class="who"><span class="avatar" style="background:#2b2d42">LL</span><span class="nm">Liam Lawson</span></div></td>
+                <td class="tm"><span class="dot" style="background:#2b2d42"></span>Racing Bulls</td>
+                <td class="nat"><span class="flag">🇳🇿</span>New Zealand</td>
+                <td>24</td>
+                <td>0</td>
+                <td class="pts">89</td>
+            </tr>
+            <tr>
+                <td class="pos">10</td>
+                <td><div class="who"><span class="avatar" style="background:#0077d6">PG</span><span class="nm">Pierre Gasly</span></div></td>
+                <td class="tm"><span class="dot" style="background:#0077d6"></span>Alpine</td>
+                <td class="nat"><span class="flag">🇫🇷</span>France</td>
+                <td>30</td>
+                <td>0</td>
+                <td class="pts">42</td>
+            </tr>
+            <tr>
+                <td class="pos">11</td>
+                <td><div class="who"><span class="avatar" style="background:#2b2d42">AL</span><span class="nm">Arvid Lindblad</span></div></td>
+                <td class="tm"><span class="dot" style="background:#2b2d42"></span>Racing Bulls</td>
+                <td class="nat"><span class="flag">🇬🇧</span>United Kingdom</td>
+                <td>19</td>
+                <td>0</td>
+                <td class="pts">38</td>
+            </tr>
+            <tr>
+                <td class="pos">12</td>
+                <td><div class="who"><span class="avatar" style="background:#0077d6">FC</span><span class="nm">Franco Colapinto</span></div></td>
+                <td class="tm"><span class="dot" style="background:#0077d6"></span>Alpine</td>
+                <td class="nat"><span class="flag">🇦🇷</span>Argentina</td>
+                <td>23</td>
+                <td>0</td>
+                <td class="pts">27</td>
+            </tr>
+            <tr>
+                <td class="pos">13</td>
+                <td><div class="who"><span class="avatar" style="background:#b30000">OB</span><span class="nm">Oliver Bearman</span></div></td>
+                <td class="tm"><span class="dot" style="background:#b30000"></span>Haas</td>
+                <td class="nat"><span class="flag">🇬🇧</span>United Kingdom</td>
+                <td>21</td>
+                <td>0</td>
+                <td class="pts">23</td>
+            </tr>
+            <tr>
+                <td class="pos">14</td>
+                <td><div class="who"><span class="avatar" style="background:#d6302a">GB</span><span class="nm">Gabriel Bortoleto</span></div></td>
+                <td class="tm"><span class="dot" style="background:#d6302a"></span>Audi</td>
+                <td class="nat"><span class="flag">🇧🇷</span>Brazil</td>
+                <td>22</td>
+                <td>0</td>
+                <td class="pts">14</td>
+            </tr>
+            <tr>
+                <td class="pos">15</td>
+                <td><div class="who"><span class="avatar" style="background:#d6302a">NH</span><span class="nm">Nico Hülkenberg</span></div></td>
+                <td class="tm"><span class="dot" style="background:#d6302a"></span>Audi</td>
+                <td class="nat"><span class="flag">🇩🇪</span>Germany</td>
+                <td>39</td>
+                <td>0</td>
+                <td class="pts">14</td>
+            </tr>
+            <tr>
+                <td class="pos">16</td>
+                <td><div class="who"><span class="avatar" style="background:#b30000">EO</span><span class="nm">Esteban Ocon</span></div></td>
+                <td class="tm"><span class="dot" style="background:#b30000"></span>Haas</td>
+                <td class="nat"><span class="flag">🇫🇷</span>France</td>
+                <td>30</td>
+                <td>0</td>
+                <td class="pts">7</td>
+            </tr>
+            <tr>
+                <td class="pos">17</td>
+                <td><div class="who"><span class="avatar" style="background:#006f62">FA</span><span class="nm">Fernando Alonso</span></div></td>
+                <td class="tm"><span class="dot" style="background:#006f62"></span>Aston Martin</td>
+                <td class="nat"><span class="flag">🇪🇸</span>Spain</td>
+                <td>45</td>
+                <td>0</td>
+                <td class="pts">7</td>
+            </tr>
+            <tr>
+                <td class="pos">18</td>
+                <td><div class="who"><span class="avatar" style="background:#1868db">CS</span><span class="nm">Carlos Sainz</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1868db"></span>Williams</td>
+                <td class="nat"><span class="flag">🇪🇸</span>Spain</td>
+                <td>32</td>
+                <td>0</td>
+                <td class="pts">7</td>
+            </tr>
+            <tr>
+                <td class="pos">19</td>
+                <td><div class="who"><span class="avatar" style="background:#1868db">AA</span><span class="nm">Alex Albon</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1868db"></span>Williams</td>
+                <td class="nat"><span class="flag">🇹🇭</span>Thailand</td>
+                <td>30</td>
+                <td>0</td>
+                <td class="pts">5</td>
+            </tr>
+            <tr>
+                <td class="pos">20</td>
+                <td><div class="who"><span class="avatar" style="background:#2b2d42">YT</span><span class="nm">Yuki Tsunoda</span></div></td>
+                <td class="tm"><span class="dot" style="background:#2b2d42"></span>Racing Bulls</td>
+                <td class="nat"><span class="flag">🇯🇵</span>Japan</td>
+                <td>26</td>
+                <td>0</td>
+                <td class="pts">1</td>
+            </tr>
+            <tr>
+                <td class="pos">21</td>
+                <td><div class="who"><span class="avatar" style="background:#b30000">RH</span><span class="nm">Ryo Hirakawa</span></div></td>
+                <td class="tm"><span class="dot" style="background:#b30000"></span>Haas</td>
+                <td class="nat"><span class="flag">🇯🇵</span>Japan</td>
+                <td>&mdash;</td>
+                <td>0</td>
+                <td class="pts">1</td>
+            </tr>
+            <tr>
+                <td class="pos">22</td>
+                <td><div class="who"><span class="avatar" style="background:#006f62">LS</span><span class="nm">Lance Stroll</span></div></td>
+                <td class="tm"><span class="dot" style="background:#006f62"></span>Aston Martin</td>
+                <td class="nat"><span class="flag">🇨🇦</span>Canada</td>
+                <td>28</td>
+                <td>0</td>
+                <td class="pts">0</td>
+            </tr>
+            <tr>
+                <td class="pos">23</td>
+                <td><div class="who"><span class="avatar" style="background:#1b2a4a">VB</span><span class="nm">Valtteri Bottas</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1b2a4a"></span>Cadillac</td>
+                <td class="nat"><span class="flag">🇫🇮</span>Finland</td>
+                <td>37</td>
+                <td>0</td>
+                <td class="pts">0</td>
+            </tr>
+            <tr>
+                <td class="pos">24</td>
+                <td><div class="who"><span class="avatar" style="background:#1b2a4a">SP</span><span class="nm">Sergio Pérez</span></div></td>
+                <td class="tm"><span class="dot" style="background:#1b2a4a"></span>Cadillac</td>
+                <td class="nat"><span class="flag">🇲🇽</span>Mexico</td>
+                <td>36</td>
+                <td>0</td>
+                <td class="pts">0</td>
+            </tr>
+            <tr>
+                <td class="pos">25</td>
+                <td><div class="who"><span class="avatar" style="background:#b30000">RC</span><span class="nm">Rafael Camara</span></div></td>
+                <td class="tm"><span class="dot" style="background:#b30000"></span>Haas</td>
+                <td class="nat"><span class="flag">🇧🇷</span>Brazil</td>
+                <td>&mdash;</td>
+                <td>0</td>
+                <td class="pts">0</td>
+            </tr>
+                </tbody>
+            </table>
+            </div>
+            <p class="foot-note">Wins are this season only. Ages for Hirakawa and Camara weren't confirmed. Constructors' totals are as published, so Red Bull and Racing Bulls don't exactly match the sum of their drivers' points: Liam Lawson scored for Red Bull at the Dutch, Italian and Spanish Grands Prix.</p>
+
+            <h3 class="cons-head">Constructors' Championship</h3>
+            <div class="cons-row">
+                <span class="cons-pos">1</span>
+                <span class="cons-name">Mercedes</span>
+                <span class="cons-bar"><span style="width:100.0%; background:#0f8b84"></span></span>
+                <span class="cons-pts">652</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">2</span>
+                <span class="cons-name">Ferrari</span>
+                <span class="cons-bar"><span style="width:78.2%; background:#c00000"></span></span>
+                <span class="cons-pts">510</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">3</span>
+                <span class="cons-name">Red Bull</span>
+                <span class="cons-bar"><span style="width:63.7%; background:#1b3fcc"></span></span>
+                <span class="cons-pts">415</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">4</span>
+                <span class="cons-name">McLaren</span>
+                <span class="cons-bar"><span style="width:61.0%; background:#e56a00"></span></span>
+                <span class="cons-pts">398</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">5</span>
+                <span class="cons-name">Racing Bulls</span>
+                <span class="cons-bar"><span style="width:17.5%; background:#2b2d42"></span></span>
+                <span class="cons-pts">114</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">6</span>
+                <span class="cons-name">Alpine</span>
+                <span class="cons-bar"><span style="width:10.6%; background:#0077d6"></span></span>
+                <span class="cons-pts">69</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">7</span>
+                <span class="cons-name">Haas</span>
+                <span class="cons-bar"><span style="width:4.8%; background:#b30000"></span></span>
+                <span class="cons-pts">31</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">8</span>
+                <span class="cons-name">Audi</span>
+                <span class="cons-bar"><span style="width:4.3%; background:#d6302a"></span></span>
+                <span class="cons-pts">28</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">9</span>
+                <span class="cons-name">Williams</span>
+                <span class="cons-bar"><span style="width:1.8%; background:#1868db"></span></span>
+                <span class="cons-pts">12</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">10</span>
+                <span class="cons-name">Aston Martin</span>
+                <span class="cons-bar"><span style="width:1.5%; background:#006f62"></span></span>
+                <span class="cons-pts">7</span>
+            </div>
+            <div class="cons-row">
+                <span class="cons-pos">11</span>
+                <span class="cons-name">Cadillac</span>
+                <span class="cons-bar"><span style="width:1.5%; background:#1b2a4a"></span></span>
+                <span class="cons-pts">0</span>
+            </div>
+        </div>
+    </section>
+</div>
+
+<footer>
+    <label for="mercedes" class="team-circle" title="Mercedes">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#0f8b84"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">MER</text></svg>
+    </label>
+    <label for="ferrari" class="team-circle" title="Ferrari">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#c00000"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">FER</text></svg>
+    </label>
+    <label for="redbull" class="team-circle" title="Red Bull">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#1b3fcc"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">RBR</text></svg>
+    </label>
+    <label for="mclaren" class="team-circle" title="McLaren">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e56a00"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">MCL</text></svg>
+    </label>
+    <label for="astonmartin" class="team-circle" title="Aston Martin">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#006f62"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">AMR</text></svg>
+    </label>
+    <label for="alpine" class="team-circle" title="Alpine">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#0077d6"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">ALP</text></svg>
+    </label>
+    <label for="williams" class="team-circle" title="Williams">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#1868db"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">WIL</text></svg>
+    </label>
+    <label for="rb" class="team-circle" title="Racing Bulls">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#2b2d42"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="Inter,Arial">RB</text></svg>
+    </label>
+    <label for="audi" class="team-circle" title="Audi">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#d6302a"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">AUD</text></svg>
+    </label>
+    <label for="haas" class="team-circle" title="Haas">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#b30000"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">HAS</text></svg>
+    </label>
+    <label for="cadillac" class="team-circle" title="Cadillac">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#1b2a4a"/><text x="20" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter,Arial">CAD</text></svg>
+    </label>
+    <span class="trophy-row c-mercedes"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-ferrari"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-redbull"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-mclaren"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-astonmartin"><span class="t-empty">No titles yet</span></span>
+    <span class="trophy-row c-alpine"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-williams"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"><img src="images/f1trophyconstructor-removebg-preview.png" alt="Constructors' trophy"></span>
+    <span class="trophy-row c-rb"><span class="t-empty">No titles yet</span></span>
+    <span class="trophy-row c-audi"><span class="t-empty">No titles yet</span></span>
+    <span class="trophy-row c-haas"><span class="t-empty">No titles yet</span></span>
+    <span class="trophy-row c-cadillac"><span class="t-empty">No titles yet</span></span>
+</footer>
+
+<script>
+/* Live standings: pulls from the Jolpica F1 API (Ergast successor) on every page load.
+   If the request fails, the standings already written in the HTML stay on screen. */
+(function(){
+  var API='https://api.jolpi.ca/ergast/f1/current';
+  var TEAMS={
+    mercedes:{n:'Mercedes',c:'#0f8b84'}, ferrari:{n:'Ferrari',c:'#c00000'}, redbull:{n:'Red Bull',c:'#1b3fcc'},
+    mclaren:{n:'McLaren',c:'#e56a00'}, astonmartin:{n:'Aston Martin',c:'#006f62'}, alpine:{n:'Alpine',c:'#0077d6'},
+    williams:{n:'Williams',c:'#1868db'}, rb:{n:'Racing Bulls',c:'#2b2d42'}, audi:{n:'Audi',c:'#d6302a'},
+    haas:{n:'Haas',c:'#b30000'}, cadillac:{n:'Cadillac',c:'#1b2a4a'}
+  };
+  var NAT={
+    Italian:['🇮🇹','Italy'], British:['🇬🇧','United Kingdom'], Monegasque:['🇲🇨','Monaco'], Dutch:['🇳🇱','Netherlands'],
+    Australian:['🇦🇺','Australia'], French:['🇫🇷','France'], 'New Zealander':['🇳🇿','New Zealand'], Argentine:['🇦🇷','Argentina'],
+    Brazilian:['🇧🇷','Brazil'], German:['🇩🇪','Germany'], Spanish:['🇪🇸','Spain'], Thai:['🇹🇭','Thailand'],
+    Japanese:['🇯🇵','Japan'], Canadian:['🇨🇦','Canada'], Finnish:['🇫🇮','Finland'], Mexican:['🇲🇽','Mexico'],
+    American:['🇺🇸','USA'], Danish:['🇩🇰','Denmark'], Chinese:['🇨🇳','China'], Swiss:['🇨🇭','Switzerland'],
+    Austrian:['🇦🇹','Austria'], Swedish:['🇸🇪','Sweden'], Belgian:['🇧🇪','Belgium'], Polish:['🇵🇱','Poland']
+  };
+  function teamKey(c){
+    if(!c) return null;
+    var id=String(c.constructorId||'').toLowerCase(), n=String(c.name||'').toLowerCase();
+    if(id==='rb'||/racing bulls|vcarb|^rb\b|visa cash/.test(n)) return 'rb';
+    if(id==='red_bull'||/red bull/.test(n)) return 'redbull';
+    if(/mercedes/.test(id+n)) return 'mercedes';
+    if(/ferrari/.test(id+n)) return 'ferrari';
+    if(/mclaren/.test(id+n)) return 'mclaren';
+    if(/aston/.test(id+n)) return 'astonmartin';
+    if(/alpine/.test(id+n)) return 'alpine';
+    if(/williams/.test(id+n)) return 'williams';
+    if(/audi|sauber/.test(id+n)) return 'audi';
+    if(/haas/.test(id+n)) return 'haas';
+    if(/cadillac/.test(id+n)) return 'cadillac';
+    return null;
+  }
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function getJSON(path){
+    var ctl=('AbortController' in window)?new AbortController():null, t=setTimeout(function(){ctl&&ctl.abort();},8000);
+    return fetch(API+path,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(t);if(!r.ok)throw new Error(r.status);return r.json();});
+  }
+  function age(dob){
+    var b=new Date(dob), n=new Date(); if(isNaN(b))return '&mdash;';
+    var a=n.getFullYear()-b.getFullYear(), m=n.getMonth()-b.getMonth();
+    if(m<0||(m===0&&n.getDate()<b.getDate())) a--; return a;
+  }
+  function renderDrivers(list){
+    var tb=document.querySelector('#standings-page tbody'); if(!tb||!list.length)return;
+    tb.innerHTML=list.map(function(d){
+      var dr=d.Driver, cs=d.Constructors||[], k=teamKey(cs[cs.length-1]), t=TEAMS[k]||{n:(cs.length?cs[cs.length-1].name:'&mdash;'),c:'#888'};
+      var nat=NAT[dr.nationality]||['',dr.nationality||''];
+      var ini=((dr.givenName||'?')[0]+(dr.familyName||'?')[0]).toUpperCase();
+      return '<tr><td class="pos">'+esc(d.position)+'</td>'+
+        '<td><div class="who"><span class="avatar" style="background:'+t.c+'">'+esc(ini)+'</span><span class="nm">'+esc(dr.givenName+' '+dr.familyName)+'</span></div></td>'+
+        '<td class="tm"><span class="dot" style="background:'+t.c+'"></span>'+esc(t.n)+'</td>'+
+        '<td class="nat"><span class="flag">'+nat[0]+'</span>'+esc(nat[1])+'</td>'+
+        '<td>'+age(dr.dateOfBirth)+'</td><td>'+esc(d.wins)+'</td><td class="pts">'+esc(d.points)+'</td></tr>';
+    }).join('');
+  }
+  function renderConstructors(list,season){
+    var host=document.querySelector('#standings-page .standings'), head=host&&host.querySelector('.cons-head'); if(!head||!list.length)return;
+    host.querySelectorAll('.cons-row').forEach(function(r){r.remove();});
+    var top=Math.max(parseFloat(list[0].points)||0,1), frag=document.createDocumentFragment();
+    list.forEach(function(c){
+      var k=teamKey(c.Constructor), t=TEAMS[k]||{n:c.Constructor.name,c:'#888'}, pts=parseFloat(c.points)||0;
+      var row=document.createElement('div'); row.className='cons-row';
+      row.innerHTML='<span class="cons-pos">'+esc(c.position)+'</span><span class="cons-name">'+esc(t.n)+'</span>'+
+        '<span class="cons-bar"><span style="width:'+Math.max(pts/top*100,1.5).toFixed(1)+'%; background:'+t.c+'"></span></span>'+
+        '<span class="cons-pts">'+esc(c.points)+'</span>';
+      frag.appendChild(row);
+      var pill=k&&document.querySelector('#'+k+'-page .meta .pill:nth-child(2)');
+      if(pill) pill.textContent=c.points+' pts in '+season;
+    });
+    head.parentNode.insertBefore(frag,head.nextSibling);
+    var wrap=host.querySelectorAll('.cons-row'); // keep rows directly after the heading, in order
+    wrap.forEach(function(r){head.parentNode.appendChild(r);});
+  }
+  function renderHeader(season,round,sched){
+    var h2=document.querySelector('#standings-page .sh h2'), sub=document.querySelector('#standings-page .sh .sub');
+    if(h2) h2.textContent=season+' Driver Standings';
+    if(!sub) return;
+    var races=(sched&&sched.MRData&&sched.MRData.RaceTable&&sched.MRData.RaceTable.Races)||[], total=races.length;
+    var last=null,next=null,now=new Date();
+    races.forEach(function(r){ if(+r.round===+round) last=r; if(!next&&new Date(r.date+'T'+(r.time||'23:59:00Z'))>now) next=r; });
+    var s='After round '+round+(total?' of '+total:'');
+    if(last) s+=', the '+esc(last.raceName);
+    if(next){ var d=new Date(next.date+'T12:00:00Z'); s+=' &middot; next up '+esc(next.raceName)+' on '+d.getUTCDate()+' '+d.toLocaleString('en-GB',{month:'short',timeZone:'UTC'}); }
+    else if(total&&+round>=total) s+=' &middot; final standings';
+    sub.innerHTML=s;
+    var note=document.querySelector('#standings-page .foot-note');
+    if(note) note.innerHTML='Wins are this season only. Live data from the Jolpica F1 API, refreshed each time this page loads. Constructors\' totals are as published, so they can differ from the sum of a team\'s drivers when a driver changed teams mid-season.';
+  }
+
+  /* Champions: trophies and hover card */
+  var WDC_IMG='images/f1-wdc-trophy-printable-01-removebg-preview.png', WCC_IMG='images/f1trophyconstructor-removebg-preview.png';
+  var WDC={Hamilton:[2008,2014,2015,2017,2018,2019,2020],Verstappen:[2021,2022,2023,2024],Alonso:[2005,2006],Norris:[2025],Antonelli:[2026]};
+  var CHAMP={season:2026,driver:'Antonelli',team:'Mercedes'}; /* edit when a new champion is decided */
+  function trophy(src,label){var i=document.createElement('img');i.className='ti';i.src=src;i.alt=label;i.title=label;return i;}
+  function decorate(){
+    document.querySelectorAll('#standings-page tbody .who').forEach(function(w){
+      if(w.querySelector('.tip'))return;
+      var nm=w.querySelector('.nm'); if(!nm)return;
+      var parts=nm.textContent.trim().split(/\s+/), fam=parts[parts.length-1], yrs=WDC[fam]||[];
+      var tip=document.createElement('div'); tip.className='tip'; tip.setAttribute('role','tooltip');
+      tip.innerHTML=yrs.length
+        ? '<div class="tip-cap">World Drivers\u2019 Champion'+(yrs.length>1?' \u00d7'+yrs.length:'')+'</div><div class="tip-row">'+
+          yrs.map(function(y){return '<figure><img src="'+WDC_IMG+'" alt=""><figcaption>'+y+'</figcaption></figure>';}).join('')+'</div>'
+        : '<div class="tip-cap">No drivers\u2019 titles yet</div>';
+      w.tabIndex=0; w.appendChild(tip);
+      if(fam===CHAMP.driver) w.insertBefore(trophy(WDC_IMG,CHAMP.season+' World Drivers\u2019 Champion'),nm);
+    });
+    document.querySelectorAll('#standings-page .cons-row .cons-name').forEach(function(c){
+      if(c.querySelector('img'))return;
+      if(c.textContent.trim()===CHAMP.team) c.insertBefore(trophy(WCC_IMG,CHAMP.season+' World Constructors\u2019 Champion'),c.firstChild);
+    });
+  }
+  decorate();
+  Promise.all([getJSON('/driverStandings.json'),getJSON('/constructorStandings.json'),getJSON('.json').catch(function(){return null;})])
+  .then(function(r){
+    var dl=r[0].MRData.StandingsTable.StandingsLists[0], cl=r[1].MRData.StandingsTable.StandingsLists[0];
+    if(!dl||!cl) return;
+    renderDrivers(dl.DriverStandings); renderConstructors(cl.ConstructorStandings,dl.season); renderHeader(dl.season,dl.round,r[2]); decorate();
+  }).catch(function(){ /* offline or API down: keep the standings already in the page */ });
+})();
+</script>
+</body>
+</html>
